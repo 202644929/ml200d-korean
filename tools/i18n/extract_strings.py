@@ -2,7 +2,8 @@
 """Extract translatable UI strings (menu_entry .name/.help/.help2 and CHOICES(...) lists)
 from Magic Lantern core src/*.c and the 200D-shipped modules.
 
-Output: CSV with columns id,file,line,field,english,korean,status,note
+Output: tools/i18n/template.csv (id,file,line,field,english,translation,status,note),
+translation empty. Merge into a language with merge_lang.py --lang <code>.
 id format: <relpath>:<line>:<field>[:<idx>]  (idx only for CHOICES entries)
 """
 import re
@@ -63,7 +64,7 @@ def extract_file(path, rows):
             if not value.strip():
                 continue
             _id = rel + ':' + str(lineno) + ':' + field
-            rows.append([_id, rel, lineno, field, value, "", "untranslated", ""])
+            rows.append([_id, rel, lineno, field, value, "", "new", ""])
 
     for lineno, inner in find_choices_blocks(text):
         idx = 0
@@ -72,7 +73,7 @@ def extract_file(path, rows):
             if not value.strip():
                 continue
             _id = rel + ':' + str(lineno) + ':choice:' + str(idx)
-            rows.append([_id, rel, lineno, 'choice:' + str(idx), value, "", "untranslated", ""])
+            rows.append([_id, rel, lineno, 'choice:' + str(idx), value, "", "new", ""])
             idx += 1
 
 
@@ -91,10 +92,10 @@ def main():
         for c_file in sorted(mod_dir.glob("*.c")):
             extract_file(c_file, rows)
 
-    out_path = REPO_ROOT / "tools" / "i18n" / "strings_ko.csv"
+    out_path = REPO_ROOT / "tools" / "i18n" / "template.csv"
     with open(out_path, "w", newline='', encoding='utf-8') as f:
         w = csv.writer(f)
-        w.writerow(["id", "file", "line", "field", "english", "korean", "status", "note"])
+        w.writerow(["id", "file", "line", "field", "english", "translation", "status", "note"])
         w.writerows(rows)
 
     print("Extracted " + str(len(rows)) + " strings -> " + str(out_path))

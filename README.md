@@ -45,6 +45,42 @@ ML에는 원래 다국어(i18n) 기능이 없습니다. 메뉴 문장이 C 코�
 
 원본의 영어 메뉴 문장과 기존 `.rbf` 폰트 파일은 하나도 고치지 않았습니다. 새 버전이 나와도 번역표만 다시 맞추면 됩니다.
 
+## 3단계: 언어 공통 구조로 바꿈 (2026-10-05)
+
+한국어에만 맞춰져 있던 구조를 다른 언어도 같은 방식으로 넣을 수 있게 바꿨습니다. 한국어 결과물은 그대로입니다. 빌드한 `autoexec.bin` 크기와 번역표가 바꾸기 전과 똑같습니다. **이 단계는 아직 실기 200D에서 확인하지 않았습니다.**
+
+이름과 위치가 바뀐 것
+
+- `ko_tr()` → `i18n_tr()`
+- `src/ko_overrides.c` → 빌드할 때 `build/i18n_strings.c`로 자동 생성되고, 소스에는 없습니다.
+- `tools/i18n/strings_ko.csv` → `tools/i18n/lang/ko.csv` (번역 열 이름 `korean` → `translation`)
+- `.kox` → `.rbx` (`RBF 확장`의 줄임말)
+  - 파일 머리는 `RBX1`이고, 내용은 그대로입니다.
+  - 카드 경로는 `ML/FONTS/*.RBX`입니다.
+  - 폰트 파일은 `data/fonts/ko/`에 있습니다.
+- `gen_ko_overrides.py` → `gen_strings.py`
+- `gen_kox.py` → `gen_rbx.py`
+
+새로 생긴 것
+
+- `make ML_LANG=ko`: 빌드할 때 언어를 고릅니다.
+  - 지정하지 않으면 영어이고, 번역이 들어가지 않습니다.
+  - 변수 이름이 `LANG`이 아닌 이유: `LANG`은 셸의 로캘 변수와 겹칩니다.
+- `gen_rbx.py`
+  - 언어별 폰트는 파일 맨 위의 `LANG_FONTS` 표에서 정합니다.
+  - 번역에 쓴 글자가 폰트에 없으면 실패하고, 어떤 글자인지 알려 줍니다.
+- `extract_strings.py` → `template.csv`: 소스에서 문장을 새로 뽑습니다.
+- `merge_lang.py --lang <코드>`: 뽑은 문장을 언어 CSV에 합칩니다.
+  - 줄 번호가 밀려도 기존 번역을 지우지 않습니다.
+  - 사라진 번역이 있으면 경고를 냅니다.
+- `tools/i18n/tests/`: 테스트 22개
+- `tools/i18n/README.md`: 번역자용 안내
+
+알려진 한계
+
+- 번역이 기존 폰트 안의 글자(라틴 문자)만 쓰는 언어(독일어·프랑스어 등)는 아직 안 됩니다.
+- 언어를 바꿔 빌드할 때는 먼저 `make clean`을 해야 합니다.
+
 ## 그 밖에 200D용으로 바꾼 것
 
 - `platform/200D.101/features.h`: 꺼져 있던 기능을 켰습니다. 하나씩 켜고 빌드해서 확인했습니다.
@@ -58,10 +94,12 @@ ML에는 원래 다국어(i18n) 기능이 없습니다. 메뉴 문장이 C 코�
 
 ## 이 저장소에 있는 것
 
-- `ml200d-ko.patch`: 위 변경 전체입니다. 원본 `magiclantern_simplified`의 `dev` 브랜치 커밋 `BASE_COMMIT`에 적용합니다.
-- `tools/i18n/`: 번역표와 스크립트입니다.
-- `data/fonts/*.kox`: 한글 폰트 파일입니다.
+- `ml200d-ko.patch`: 위 변경 전체입니다(3단계 포함). 원본 `magiclantern_simplified`의 `dev` 브랜치 커밋 `BASE_COMMIT`에 적용합니다.
+- `tools/i18n/`: 번역표(`lang/ko.csv`), 스크립트, 테스트, 안내서입니다.
+- `data/fonts/ko/*.rbx`: 한글 글자 모양 파일입니다.
 - 카드에 바로 넣을 빌드: [Releases](../../releases)의 `magiclantern-200D-ko.zip`
+  - 2단계(2026-09-15) 빌드라서 글자 파일이 아직 `.kox`입니다.
+  - 3단계 빌드는 실기 확인 뒤에 올립니다.
 
 ## 직접 빌드하기
 
@@ -71,8 +109,14 @@ cd magiclantern_simplified
 git checkout $(cat ../ml200d-korean/BASE_COMMIT)
 git apply ../ml200d-korean/ml200d-ko.patch
 cd platform/200D.101
-make ARM_BINPATH=/path/to/arm-none-eabi-12.3/bin
+make clean
+make ARM_BINPATH=/path/to/arm-none-eabi-12.3/bin ML_LANG=ko
+# 결과: build/magiclantern.zip
 ```
+
+- 빌드에는 `python3`가 필요합니다.
+- 글자 파일을 다시 만들려면(`gen_rbx.py`) `python3-pil`, `python3-fonttools`, `fonts-noto-cjk`가 필요합니다.
+- 작은 글씨용 [Galmuri11](https://github.com/quiple/galmuri)(OFL)을 `200d-ko/fonts/Galmuri11.ttf`에 두세요.
 
 ARM GNU Toolchain 12.3을 쓰세요. 너무 새 gcc(15 등)로는 ML의 옛 Lua 소스가 빌드되지 않습니다.
 
@@ -81,6 +125,7 @@ ARM GNU Toolchain 12.3을 쓰세요. 너무 새 gcc(15 등)로는 ML의 옛 Lua 
 - 이미 ML이 설치된 카드라면 zip 안의 파일을 카드에 덮어쓰면 됩니다. 처음 설치하는 방법은 Magic Lantern 공식 안내를 따르세요.
 - `autoexec.bin`과 `ML/modules/200D_101.sym`은 항상 같이 바꾸세요. 하나만 바꾸면 모듈이 멈춥니다.
 - 카드에 예전 `DOT_TUNE.MO`가 남아 있으면 지우세요.
+- 3단계 빌드부터는 `ML/FONTS/*.RBX`를 읽습니다. 예전 `*.KOX`는 지워도 됩니다. 글자 파일이 없으면 메뉴는 영어로 나옵니다.
 - 카메라가 비정상 종료된 뒤에는 `ML/modules/LOADING.LCK` 때문에 모듈이 안 켜질 수 있습니다. 지우세요.
 - 펌웨어를 고치는 일이므로 문제가 생겨도 책임지지 않습니다.
 

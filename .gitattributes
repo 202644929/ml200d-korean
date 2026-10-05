@@ -1,3 +1,4 @@
 *.patch -text
 *.csv -text
 *.kox binary
+*.rbx binary
